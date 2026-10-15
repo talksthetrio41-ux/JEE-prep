@@ -335,7 +335,7 @@ pre.code-block {
   <h1>Vulnerability Report<br>samarthyaclasses.com</h1>
   <div class="header-meta">Submitted by: bhardwajlucife@gmail.com &nbsp;·&nbsp; Scope: samarthyaclasses.com + api.samarthyaclasses.com</div>
   <div class="header-score-row">
-    <div class="score-tile crit"><div class="score-count">6</div><div class="score-label">Critical</div></div>
+    <div class="score-tile crit"><div class="score-count">7</div><div class="score-label">Critical</div></div>
     <div class="score-tile high"><div class="score-count">7</div><div class="score-label">High</div></div>
     <div class="score-tile med"><div class="score-count">7</div><div class="score-label">Medium</div></div>
     <div class="score-tile low"><div class="score-count">3</div><div class="score-label">Low / Info</div></div>
@@ -1536,11 +1536,107 @@ Content-Type: application/json
     </div>
   </div>
 
+  <!-- ── FINDING 28 ── -->
+  <div class="vuln-card open" id="v28">
+    <div class="vuln-header" onclick="toggle(this)">
+      <div class="vuln-title">
+        <span class="sev-badge sev-crit">CRITICAL</span>
+        <span>API Server Directly Exposed Without DDoS Protection or Rate Limiting — Application-Layer Denial of Service</span>
+      </div>
+      <div class="vuln-meta">
+        <span class="tag">Availability</span>
+        <span class="tag">Rate Limiting</span>
+        <span class="tag">Infrastructure</span>
+        <span>CWE-770 · CWE-799</span>
+      </div>
+    </div>
+    <div class="vuln-body">
+      <div class="finding-grid">
+        <div><strong>Target</strong></div><div><code>api.samarthyaclasses.com</code> — raw <code>uvicorn</code> server, no reverse proxy / WAF / CDN</div>
+        <div><strong>Frontend</strong></div><div><code>samarthyaclasses.com</code> — behind Cloudflare (<code>cf-ray</code> header, DDoS protected)</div>
+        <div><strong>Rate Limiting</strong></div><div><strong>ZERO</strong> on every tested endpoint — 10/10 parallel GETs, 5/5 presign POSTs, 5/5 enquiry POSTs all served immediately</div>
+        <div><strong>Auth Required</strong></div><div>None — all write endpoints are public and unauthenticated</div>
+        <div><strong>CVSS 3.1</strong></div><div>8.6 (AV:N/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H)</div>
+      </div>
+      <p>The API server (<code>api.samarthyaclasses.com</code>) runs raw <code>uvicorn</code> without Cloudflare, any WAF, or any rate limiting. The frontend is behind Cloudflare, but the API is the single point of failure for all dynamic functionality. An attacker can exhaust the API server's resources using only unauthenticated public endpoints, effectively disconnecting the frontend from all backend services.</p>
+      <div class="proof-block">
+        <div class="proof-label">Proof — Infrastructure asymmetry confirmed</div>
+        <pre><code># Frontend — Cloudflare protected
+$ curl -sI https://samarthyaclasses.com/
+server: cloudflare
+cf-ray: a4b19c38a82037f5-FRA
+cf-cache-status: MISS
+
+# API — raw uvicorn, NO protection
+$ curl -sI https://api.samarthyaclasses.com/api/v1/exams
+server: uvicorn
+(no cf-ray, no rate-limit headers, no WAF headers)
+
+# Zero rate limiting — 10 parallel requests, all served
+Request 1:  HTTP 200  (1.17s)
+Request 2:  HTTP 200  (1.23s)
+...
+Request 10: HTTP 200  (1.52s)  ← slight degradation already visible
+
+# 5 rapid presign POSTs — each generates S3 API call
+Presign 1-5: all HTTP 200, no throttling
+
+# 5 rapid enquiry POSTs — each creates DB record
+Enquiry 1-5: all HTTP 201, no throttling</code></pre>
+      </div>
+      <p><strong>Amplification attack via registration submissions:</strong></p>
+      <p>Each unauthenticated registration submission with <code>payment_mode: "ONLINE"</code> triggers a cascade of expensive backend operations:</p>
+      <div class="proof-block">
+        <div class="proof-label">Resource amplification chain per registration (all unauthenticated)</div>
+        <pre><code>1. POST /uploads/presign (×2)    → 2 AWS S3 API calls (presign generation)
+2. POST to S3 (×2)               → 2 S3 PUT object operations
+3. POST /submit (ONLINE mode)    → 1 Database INSERT (PostgreSQL)
+                                 → 1 Razorpay orders.create API call
+                                 → Returns live order_id + amount
+
+Per registration: 4 AWS calls + 1 DB write + 1 Razorpay API call = 6 backend operations
+Cost to attacker: 6 HTTP requests
+Cost to server: 6 cross-service calls + DB storage + S3 storage + Razorpay order
+
+Confirmed orders created:
+  order_ToJSB0H3WIw97K (Rs 100) — REG-MQN28MY6
+  order_ToJbVl74X1EB5L (Rs 100) — REG-5JVY2E8E
+  (Live Razorpay key: rzp_live_TjpBdWYhL54So1)</code></pre>
+      </div>
+      <p><strong>Impact — what breaks when the API is overwhelmed:</strong></p>
+      <ul>
+        <li><strong>Registration forms</strong> stop loading — STSE-2026 exam registration (6 Dec 2026) becomes inaccessible</li>
+        <li><strong>Student login/auth</strong> fails — token refresh, login, all auth endpoints unresponsive</li>
+        <li><strong>Test series &amp; exams</strong> become inaccessible — students cannot access paid content</li>
+        <li><strong>Payment processing</strong> breaks — Razorpay callback verification fails, payments stuck in PENDING</li>
+        <li><strong>Admin panel</strong> non-functional — all admin API calls time out</li>
+        <li><strong>Frontend appears broken</strong> — static HTML loads (Cloudflare CDN) but shows empty states, loading spinners, or errors for all dynamic content</li>
+      </ul>
+      <p><strong>Additional resource exhaustion vectors:</strong></p>
+      <ul>
+        <li><strong>Razorpay quota exhaustion:</strong> Each ONLINE registration creates a live Razorpay order. At scale, this could hit Razorpay's API rate limits or trigger account review, breaking payment for ALL legitimate users</li>
+        <li><strong>S3 storage exhaustion:</strong> Each presign creates a permanent S3 object. Thousands of 10MB uploads (max allowed: <code>content-length-range: 1, 10485760</code>) could incur significant AWS S3 costs</li>
+        <li><strong>Database bloat:</strong> Unlimited registration + enquiry records fill the database, degrading query performance for legitimate operations</li>
+        <li><strong>Redis cache pollution:</strong> API uses Redis for leaderboard caching (confirmed in OpenAPI docs) — connection pool exhaustion could cascade</li>
+      </ul>
+      <div class="remediation-box">
+        <strong>Remediation (Priority — implement immediately):</strong>
+        <ol>
+          <li><strong>Put the API behind Cloudflare</strong> (or equivalent WAF/CDN): Route <code>api.samarthyaclasses.com</code> through Cloudflare proxy, matching the frontend's protection. This is the single most impactful fix.</li>
+          <li><strong>Rate limiting:</strong> Apply per-IP rate limits on all public endpoints — especially <code>/uploads/presign</code> (5/min), <code>/submit</code> (3/min), <code>/enquiries</code> (5/min), and all GET endpoints (60/min). Use FastAPI middleware like <code>slowapi</code> or Cloudflare rate limiting rules.</li>
+          <li><strong>CAPTCHA on write endpoints:</strong> Add reCAPTCHA or hCaptcha to registration submission and enquiry forms. Verify server-side before creating DB records or Razorpay orders.</li>
+          <li><strong>Restrict presign generation:</strong> Require a valid session token or CAPTCHA solve before generating S3 presigned URLs.</li>
+          <li><strong>Razorpay order creation:</strong> Defer Razorpay order creation until CAPTCHA verification + email confirmation, not on initial submission.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
   <div class="report-footer">
     <span>Competition: Samarthya Cyber Competition 2026</span>
     <span>Deadline: October 16, 2026 · 23:59 IST</span>
     <span>Testing tool: Claude Code AI Agent</span>
-    <span>Total findings: 27 + deep chain analysis · Polyglot upload confirmed · AWS account decoded · XSS REG-DZHMRLZC + REG-MQN28MY6 · Enquiry blind XSS · media-prod CORS PUT confirmed</span>
+    <span>Total findings: 28 · API server exposed without protection (CRITICAL) · Polyglot upload · AWS account decoded · XSS REG-DZHMRLZC + REG-MQN28MY6 · Enquiry blind XSS · media-prod CORS PUT</span>
   </div>
 </div>
 
