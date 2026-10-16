@@ -2298,12 +2298,24 @@ $ curl -F "Content-Type=image/png" -F "key=registrations/1/..." \
 
 # File contents: PNG header + &lt;html&gt;&lt;script&gt;alert('XSS')&lt;/script&gt;
 
-# 23+ files uploaded to production S3 with zero authentication</code></pre>
+# 25+ files uploaded to production S3 with zero authentication
+# Including: polyglot PNG/HTML, polyglot WEBP/HTML, PDF with JavaScript
+
+# Additional uploads:
+# 1. Malicious PDF with embedded app.alert() JS
+$ curl ... -d '{"file_name":"exploit.pdf","content_type":"application/pdf"}'
+→ HTTP 204 → registrations/1/e75b3fc94ee64116993fa77070b57c5e.pdf
+
+# 2. Polyglot WEBP with HTML body
+→ HTTP 204 → registrations/1/e649e258646143ef87e9755416999c49.webp
+
+# Server validates extension (PNG/JPG/WEBP/PDF) but NOT file content</code></pre>
       </div>
       <p><strong>Impact:</strong></p>
       <ul>
         <li><strong>S3 storage exhaustion:</strong> Unlimited 10MB file uploads → fill the S3 bucket → storage costs spike</li>
         <li><strong>Polyglot file attacks:</strong> Upload files that are valid images but contain HTML/JS — if served with wrong Content-Type, XSS executes</li>
+        <li><strong>Malicious PDF:</strong> PDF with embedded JavaScript fires when admin downloads and opens in Adobe Reader</li>
         <li><strong>Malware hosting:</strong> Use the S3 bucket as free hosting for malicious files behind a legitimate domain</li>
       </ul>
       <div class="remediation-box">
@@ -2687,6 +2699,8 @@ No CAPTCHA. No email verification. No rate limit.</code></pre>
    └── 1 polyglot PNG/HTML file (XSS payload)
    → Bucket: samarthya-media-prod (PRODUCTION)
    → All uploaded without authentication
+   → Includes: polyglot PNG/HTML, polyglot WEBP/HTML,
+     malicious PDF with embedded JavaScript
 
 4. RAZORPAY ORDERS: 35+ orders created
    ├── order_ToKQDwIxIIeFsx (first)
